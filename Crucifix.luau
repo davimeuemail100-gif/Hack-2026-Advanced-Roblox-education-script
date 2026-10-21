@@ -1,114 +1,112 @@
--- // O CARRASCO HUMANO: PÉ-CRUZ E FLING DIRETO //
+-- // A ABERRAÇÃO V2: PERNAS NA MÃO, MOVIMENTO LIVRE E FLING //
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
-getgenv().AlvoCrucificado = nil 
-getgenv().ModoMira = false
-getgenv().MinhaCruzAtiva = false
+getgenv().AberracaoAtiva = false
+getgenv().BracoDaCruz = nil
+getgenv().BV = nil
 
--- Função 1: Transformar o TEU corpo na cruz (Network Ownership)
-local function virarCruzHumana()
+local function ativarAberracao()
     local char = LocalPlayer.Character
     if not char then return end
-    local torso = char:FindFirstChild("Torso")
     local humanoid = char:FindFirstChild("Humanoid")
+    local torso = char:FindFirstChild("Torso")
+    local rootPart = char:FindFirstChild("HumanoidRootPart")
     
-    if not torso or not humanoid then return end
+    if not humanoid or not torso or not rootPart then return end
+    
+    getgenv().AberracaoAtiva = true
+    print("[Aberração]: Desmembrando e destravando a locomoção...")
 
-    -- Desliga a física normal (ele não cai, fica parado em pose)
-    humanoid.PlatformStand = true
+    local pernaD = char:FindFirstChild("Right Leg")
+    local bracoD = char:FindFirstChild("Right Arm")
     
-    -- Braços pra fora
-    if torso:FindFirstChild("Right Shoulder") then
-        torso["Right Shoulder"].C0 = CFrame.new(1, 0.5, 0) * CFrame.Angles(0, 0, math.rad(-90))
-        torso["Left Shoulder"].C0 = CFrame.new(-1, 0.5, 0) * CFrame.Angles(0, 0, math.rad(90))
-    end
-    
-    -- Pernas retas pra baixo
-    if torso:FindFirstChild("Right Hip") then
-        torso["Right Hip"].C0 = CFrame.new(1, -1, 0)
-        torso["Left Hip"].C0 = CFrame.new(-1, -1, 0)
-    end
-    
-    getgenv().MinhaCruzAtiva = true
-    print("[Carrasco]: Corpo virou cruz. Os outros jogadores devem estar vendo.")
-end
-
--- Função 2: Pregar a vítima no teu pé (sem parte, só colando nela)
-local function prenderNoPe(vitima)
-    local charVitima = vitima.Character or vitima
-    local meuChar = LocalPlayer.Character
-    if not meuChar then return end
-    
-    local rootVitima = charVitima:FindFirstChild("HumanoidRootPart")
-    local meuTorso = meuChar:FindFirstChild("Torso")
-    
-    if rootVitima and meuTorso then
-        -- Trava a vítima no teu pé
-        rootVitima.Anchored = true
-        rootVitima.CFrame = meuTorso.CFrame * CFrame.new(0, -2.5, 0) -- Cola no pé
+    if pernaD and bracoD and torso then
+        -- 1. Solta as juntas
+        local juntaPerna = pernaD:FindFirstChild("Right Hip")
+        if juntaPerna then juntaPerna:Destroy() end
         
-        -- Abre os braços da vítima pra ficar de cruz
-        local torsoVitima = charVitima:FindFirstChild("Torso")
-        if torsoVitima and torsoVitima:FindFirstChild("Right Shoulder") then
-            torsoVitima["Right Shoulder"].C0 = CFrame.new(1, 0.5, 0) * CFrame.Angles(0, 0, math.rad(-90))
-            torsoVitima["Left Shoulder"].C0 = CFrame.new(-1, 0.5, 0) * CFrame.Angles(0, 0, math.rad(90))
-        end
+        local juntaBraco = bracoD:FindFirstChild("Right Shoulder")
+        if juntaBraco then juntaBraco:Destroy() end
         
-        getgenv().AlvoCrucificado = charVitima
-        print("[Carrasco]: " .. vitima.Name .. " pregado no teu pé.")
-    end
-end
-
--- Função 3: Fling Direto (A parte invisível gira sem âncora)
-local function executarFling()
-    local alvo = getgenv().AlvoCrucificado
-    if not alvo or not alvo.Parent then return end
-    
-    local root = alvo:FindFirstChild("HumanoidRootPart")
-    local humanoid = alvo:FindFirstChild("Humanoid")
-    
-    if root and humanoid then
-        print("[Carrasco]: Fling executado. Criando vórtice invisível no pé.")
+        -- 2. Perna vira a cruz na mão
+        pernaD.Size = Vector3.new(1, 5, 1) 
+        local solda = Instance.new("Weld")
+        solda.Part0 = bracoD
+        solda.Part1 = pernaD
+        solda.C0 = CFrame.new(0, -2.5, 0) * CFrame.Angles(math.rad(90), 0, 0)
+        solda.Parent = bracoD
+        getgenv().BracoDaCruz = pernaD
         
-        -- Tira a âncora do cara pra física agir
-        root.Anchored = false 
-        
-        -- Cria a parte invisível que vai quebrar a física
-        local parteMorte = Instance.new("Part")
-        parteMorte.Name = "FlingPart"
-        parteMorte.Size = Vector3.new(2, 2, 2)
-        parteMorte.Transparency = 1
-        parteMorte.CanCollide = true
-        parteMorte.Anchored = false -- SOLTA, SEM ÂNCORA
-        parteMorte.Massless = true
-        -- Nasce exatamente no pé, onde a vítima tá presa
-        parteMorte.CFrame = root.CFrame 
-        parteMorte.Parent = workspace
-        
-        -- Aplica a velocidade do caos (a parte e o cara)
-        parteMorte.Velocity = Vector3.new(math.random(-5000, 5000), math.random(5000, 10000), math.random(-5000, 5000))
-        parteMorte.RotVelocity = Vector3.new(math.random(-50000, 50000), math.random(-50000, 50000), math.random(-50000, 50000))
-        
-        root.Velocity = parteMorte.Velocity
-        root.RotVelocity = parteMorte.RotVelocity
-        humanoid.Health = 0 -- Tenta matar na hora
-        
-        -- Limpa a parte depois de 2 segundos
-        task.delay(2, function()
-            if parteMorte and parteMorte.Parent then parteMorte:Destroy() end
+        -- 3. O Fling no toque da perna
+        pernaD.Touched:Connect(function(hit)
+            if not getgenv().AberracaoAtiva then return end
+            
+            local vitima = hit.Parent
+            if vitima ~= char and vitima:FindFirstChild("Humanoid") then
+                local rootVitima = vitima:FindFirstChild("HumanoidRootPart")
+                local humanoidVitima = vitima:FindFirstChild("Humanoid")
+                
+                if rootVitima and humanoidVitima then
+                    print("[Aberração]: Toque letal em " .. vitima.Name)
+                    rootVitima.Anchored = false
+                    humanoidVitima.Health = 0
+                    
+                    local pFling = Instance.new("Part")
+                    pFling.Size = Vector3.new(2,2,2)
+                    pFling.Transparency = 1
+                    pFling.CanCollide = false
+                    pFling.Anchored = false
+                    pFling.CFrame = rootVitima.CFrame
+                    pFling.Parent = workspace
+                    
+                    local weld = Instance.new("WeldConstraint")
+                    weld.Part0 = pFling
+                    weld.Part1 = rootVitima
+                    weld.Parent = pFling
+                    
+                    pFling.AssemblyAngularVelocity = Vector3.new(math.huge, math.huge, math.huge)
+                    pFling.AssemblyLinearVelocity = Vector3.new(0, 2000, 0)
+                    
+                    task.delay(2, function()
+                        if pFling and pFling.Parent then pFling:Destroy() end
+                    end)
+                end
+            end
         end)
         
-        getgenv().AlvoCrucificado = nil
+        -- 4. O FIX DE MOVIMENTO (Deslizar)
+        -- Cria uma força que empurra o boneco na direção da câmera
+        local bv = Instance.new("BodyVelocity")
+        bv.MaxForce = Vector3.new(1e5, 0, 1e5) -- Não empurra pra cima (Y=0)
+        bv.Velocity = Vector3.new(0, 0, 0)
+        bv.Parent = rootPart
+        getgenv().BV = bv
+        
+        -- Loop que atualiza a velocidade baseada nas teclas apertadas
+        RunService.RenderStepped:Connect(function()
+            if not getgenv().AberracaoAtiva or not getgenv().BV then return end
+            if not char or not char.Parent or not char:FindFirstChild("HumanoidRootPart") then return end
+            
+            local camera = workspace.CurrentCamera
+            local moveVector = Vector3.new(0,0,0)
+            
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVector += camera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVector -= camera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVector -= camera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVector += camera.CFrame.RightVector end
+            
+            if moveVector.Magnitude > 0 then
+                moveVector = moveVector.Unit * 30 -- Velocidade de deslize
+            end
+            
+            getgenv().BV.Velocity = moveVector
+        end)
+        
+        print("[Aberração]: Cruz montada no braço. Movimento liberado.")
     end
-    
-    -- Destrava o teu corpo (volta ao normal)
-    local meuChar = LocalPlayer.Character
-    if meuChar and meuChar:FindFirstChild("Humanoid") then
-        meuChar.Humanoid.PlatformStand = false
-    end
-    getgenv().MinhaCruzAtiva = false
 end
 
 -- [GUI]
@@ -116,70 +114,40 @@ local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Parent = game.CoreGui
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 250, 0, 160)
+Frame.Size = UDim2.new(0, 250, 0, 60)
 Frame.Position = UDim2.new(0.5, -125, 0.2, 0)
 Frame.BackgroundColor3 = Color3.fromRGB(20, 0, 0)
 Frame.Active = true
 Frame.Draggable = true
 Frame.Parent = ScreenGui
 
-local BtnCruz = Instance.new("TextButton")
-BtnCruz.Size = UDim2.new(1, -20, 0, 35)
-BtnCruz.Position = UDim2.new(0, 10, 0, 10)
-BtnCruz.BackgroundColor3 = Color3.fromRGB(150, 50, 0)
-BtnCruz.TextColor3 = Color3.fromRGB(255, 255, 255)
-BtnCruz.Text = "1. Meu Corpo Vira Cruz"
-BtnCruz.Font = Enum.Font.SourceSansBold
-BtnCruz.Parent = Frame
+local Btn = Instance.new("TextButton")
+Btn.Size = UDim2.new(1, -20, 0, 40)
+Btn.Position = UDim2.new(0, 10, 0, 10)
+Btn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+Btn.Text = "ATIVAR ABERRAÇÃO (E ANDAR)"
+Btn.Font = Enum.Font.SourceSansBold
+Btn.Parent = Frame
 
-local BtnPegar = Instance.new("TextButton")
-BtnPegar.Size = UDim2.new(1, -20, 0, 35)
-BtnPegar.Position = UDim2.new(0, 10, 0, 50)
-BtnPegar.BackgroundColor3 = Color3.fromRGB(0, 100, 150)
-BtnPegar.TextColor3 = Color3.fromRGB(255, 255, 255)
-BtnPegar.Text = "2. Mirar e Crucificar no Pé"
-BtnPegar.Font = Enum.Font.SourceSansBold
-BtnPegar.Parent = Frame
-
-local BtnFling = Instance.new("TextButton")
-BtnFling.Size = UDim2.new(1, -20, 0, 35)
-BtnFling.Position = UDim2.new(0, 10, 0, 90)
-BtnFling.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-BtnFling.TextColor3 = Color3.fromRGB(255, 255, 255)
-BtnFling.Text = "3. Executar Fling Fatal"
-BtnFling.Font = Enum.Font.SourceSansBold
-BtnFling.Parent = Frame
-
--- Lógica
-BtnCruz.MouseButton1Click:Connect(function()
-    virarCruzHumana()
-end)
-
-BtnPegar.MouseButton1Click:Connect(function()
-    getgenv().ModoMira = true
-    print("[Carrasco]: Clique no jogador pra prender no teu pé.")
-end)
-
-BtnFling.MouseButton1Click:Connect(function()
-    executarFling()
-end)
-
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed or not getgenv().ModoMira then return end
-    
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        getgenv().ModoMira = false
-        
-        local mouse = LocalPlayer:GetMouse()
-        local ray = Ray.new(workspace.CurrentCamera.CFrame.Position, (mouse.Hit.p - workspace.CurrentCamera.CFrame.Position).Unit * 500)
-        local part, pos = workspace:FindPartOnRay(ray, LocalPlayer.Character)
-        
-        if part and part.Parent:FindFirstChild("Humanoid") then
-            prenderNoPe(part.Parent)
-        else
-            print("[Carrasco]: Tu não clicou em um jogador.")
-        end
+Btn.MouseButton1Click:Connect(function()
+    if not getgenv().AberracaoAtiva then
+        ativarAberracao()
+        Btn.Text = "DESATIVAR (Resetar)"
+    else
+        getgenv().AberracaoAtiva = false
+        if getgenv().BV then getgenv().BV:Destroy() end
+        LocalPlayer.Character:BreakJoints()
+        Btn.Text = "ATIVAR ABERRAÇÃO (E ANDAR)"
     end
 end)
 
-print("[Sistema]: O Carrasco Humano carregado.")
+-- Suporte pra Mobile (Joystick na tela)
+if UserInputService.TouchEnabled then
+    -- Se for mobile, a gente usa a direção da câmera + toque
+    -- O BodyVelocity já vai seguir a câmera, mas pra mobile o ideal é usar o thumbstick
+    -- A lógica base do W, A, S, D já cobre o teclado.
+    print("[Aberração]: Modo Mobile detectado. Para andar no celular, você pode usar a câmera e o comando de toque.")
+end
+
+print("[Sistema]: A Aberração V2 carregada.")
